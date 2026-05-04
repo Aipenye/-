@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import jakarta.annotation.PostConstruct;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Collectors;
 
 @Component
 @EnableScheduling
@@ -36,15 +37,18 @@ public class AgvSimulationEngine {
     private final List<AgvEntity>  agvs    = new CopyOnWriteArrayList<>();
     private final List<SimWorker>  workers = new CopyOnWriteArrayList<>();
 
-    // AGV 巡逻任务点（起点→货架→出库口循环）
+    // AGV 巡逻任务点（中转点各自错开，避免三车同时汇聚）
+    // AGV1 负责左侧货架（A/B/C 列），中转点在走廊左侧
     private static final double[][] AGV_WAYPOINTS_1 = {
-        {40, 20}, {6, 3}, {40, 20}, {6, 7.5}, {40, 20}, {6, 12}, {40, 20}, {6, 16.5}
+        {35, 10}, {6, 3}, {35, 10}, {6, 7.5}, {35, 10}, {6, 12}, {35, 10}, {6, 16.5}
     };
+    // AGV2 负责上半区货架（B 列上段），中转点在走廊上段
     private static final double[][] AGV_WAYPOINTS_2 = {
-        {40, 20}, {17, 23.5}, {40, 20}, {17, 28}, {40, 20}, {17, 32.5}, {40, 20}, {17, 37}
+        {40, 30}, {17, 23.5}, {40, 30}, {17, 28}, {40, 30}, {17, 32.5}, {40, 30}, {17, 37}
     };
+    // AGV3 负责右侧货架（D/E/F 列），中转点在走廊右侧
     private static final double[][] AGV_WAYPOINTS_3 = {
-        {40, 20}, {52, 3}, {40, 20}, {52, 7.5}, {40, 20}, {63, 12}, {40, 20}, {74, 16.5}
+        {45, 10}, {52, 3}, {45, 10}, {52, 7.5}, {45, 10}, {63, 12}, {45, 10}, {74, 16.5}
     };
 
     // 工人巡逻路径点
@@ -69,9 +73,9 @@ public class AgvSimulationEngine {
 
     private void initAgvs() {
         agvs.clear();
-        AgvEntity a1 = new AgvEntity(); a1.setId(1); a1.setX(40); a1.setY(5);  a1.setAngle(90);
-        AgvEntity a2 = new AgvEntity(); a2.setId(2); a2.setX(40); a2.setY(20); a2.setAngle(0);
-        AgvEntity a3 = new AgvEntity(); a3.setId(3); a3.setX(40); a3.setY(35); a3.setAngle(270);
+        AgvEntity a1 = new AgvEntity(); a1.setId(1); a1.setX(35); a1.setY(10); a1.setAngle(180);
+        AgvEntity a2 = new AgvEntity(); a2.setId(2); a2.setX(40); a2.setY(30); a2.setAngle(180);
+        AgvEntity a3 = new AgvEntity(); a3.setId(3); a3.setX(45); a3.setY(10); a3.setAngle(0);
         agvs.addAll(List.of(a1, a2, a3));
         agvTaskIndex[0] = 0; agvTaskIndex[1] = 0; agvTaskIndex[2] = 0;
     }
@@ -147,10 +151,8 @@ public class AgvSimulationEngine {
     private void updateAgvs() {
         for (int i = 0; i < agvs.size(); i++) {
             AgvEntity agv = agvs.get(i);
-            ensurePath(agv, i);
-            if (!agv.hasPath()) { agv.setState(AgvState.IDLE); continue; }
 
-            // 举升中
+            // 举升中：路径已消耗完，必须在 hasPath 检查之前处理，否则会被误判为 IDLE
             if (agv.getState() == AgvState.LIFTING) {
                 agv.setLiftingRemaining(agv.getLiftingRemaining() - TICK_MS);
                 if (agv.getLiftingRemaining() <= 0) {
@@ -162,9 +164,15 @@ public class AgvSimulationEngine {
                 continue;
             }
 
-            // 感知 + 避障
-            List<SensorSimulator.Detection> detections = sensor.detect(agv, workers);
-            AvoidanceController.AvoidanceResult ar = avoidance.evaluate(detections);
+            ensurePath(agv, i);
+            if (!agv.hasPath()) { agv.setState(AgvState.IDLE); continue; }
+
+            // 感知 + 避障（同时检测工人和其他 AGV）
+            List<AgvEntity> otherAgvs = agvs.stream()
+                    .filter(a -> a.getId() != agv.getId())
+                    .collect(Collectors.toList());
+            List<SensorSimulator.Detection> detections = sensor.detect(agv, workers, otherAgvs);
+            AvoidanceController.AvoidanceResult ar = avoidance.evaluate(detections, agv.getState());
 
             if (ar.state() == AgvState.EMERGENCY_STOP) {
                 agv.setState(AgvState.EMERGENCY_STOP);
@@ -177,8 +185,15 @@ public class AgvSimulationEngine {
             if (zone != null && traffic.isBlockedByOther(zone, agv.getId())) {
                 agv.setState(AgvState.WAITING_LOCK);
                 agv.setSpeed(0);
+                agv.setWaitingTick(agv.getWaitingTick() + TICK_MS);
+                // 等待超过 5s 则重新规划路径（绕开拥堵区域）
+                if (agv.getWaitingTick() > 5000) {
+                    agv.setWaitingTick(0);
+                    planPath(agv, i);
+                }
                 continue;
             }
+            agv.setWaitingTick(0);
             if (zone != null) traffic.tryEnter(zone, agv.getId());
 
             // 移动
