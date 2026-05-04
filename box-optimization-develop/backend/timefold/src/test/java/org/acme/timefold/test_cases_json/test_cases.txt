@@ -1,0 +1,154 @@
+Total Space: 10 x 10 x 10
+Test Case 1
+Total Boxes: 35
+
+Unique Box Types: 3
+
+Type A: Dimensions (1, 10, 2) — 15 boxes
+
+
+
+Type B: Dimensions (4, 3, 2) — 10 boxes
+
+
+
+Type C: Dimensions (2, 2, 5) — 10 boxes
+
+
+
+
+
+Test Case 2
+Total Boxes: 36
+
+Unique Box Types: 5
+
+Type A: Dimensions (5, 2, 2) — 12 boxes
+
+
+
+Type B: Dimensions (3, 3, 4) — 8 boxes
+
+
+
+Type C: Dimensions (2, 6, 3) — 10 boxes
+
+
+Type D: Dimensions (4, 1, 5) — 4 boxes
+
+Type E: Dimensions (7, 1, 7) — 2 boxes
+
+
+
+
+
+
+
+
+
+
+Total Space: 20 x 20 x 20
+Test Case 1
+Total Boxes: 60
+
+Unique Box Types: 5
+
+Type A: Dimensions (10, 10, 5) — 12 boxes
+
+
+Type B: Dimensions (8, 12, 6) — 14 boxes
+
+
+
+Type C: Dimensions (7, 5, 10) — 10 boxes
+
+Type D: Dimensions (12, 6, 9) — 8 boxes
+
+Type E: Dimensions (9, 9, 9) — 16 boxes
+
+
+
+Test Case 2
+Total Boxes: 50
+
+Unique Box Types: 5
+
+Type A: Dimensions (5, 5, 5) — 10 boxes
+
+
+
+Type B: Dimensions (4, 8, 3) — 15 boxes
+
+
+
+Type C: Dimensions (7, 2, 6) — 8 boxes
+
+
+
+Type D: Dimensions (10, 4, 4) — 5 boxes
+
+Type E: Dimensions (3, 3, 10) — 12 boxes
+
+
+
+
+Test Case 3
+Total Boxes: 50
+
+Unique Box Types: 5
+
+Type A: Dimensions (6, 6, 4) — 12 boxes
+
+
+
+Type B: Dimensions (5, 5, 7) — 10 boxes
+
+
+
+Type C: Dimensions (8, 3, 6) — 8 boxes
+
+Type D: Dimensions (10, 5, 5) — 6 boxes
+
+Type E: Dimensions (4, 6, 8) — 14 boxes
+
+
+
+
+
+
+
+
+
+
+
+
+
+Total Space: 30 x 30 x 30
+Test Case 1
+Total Boxes: 75
+
+Unique Box Types: 3
+
+Type A: Dimensions (10, 5, 10) — 50 boxes
+
+
+
+Type B: Dimensions (3, 3, 10) — 10 boxes
+
+
+
+Type C: Dimensions (3, 3, 3) — 15 boxes
+
+
+
+Test Case 2
+Total Boxes: 40
+
+Unique Box Types: 4
+
+Type A: Dimensions (5, 3, 5) — 100 boxes
+
+
+
+Type B: Dimensions (2, 2, 2) — 20 boxes
+

@@ -1,0 +1,27 @@
+before optimzing constraints
+
+10x10x10:
+
+test case 1 was solved by timefold succesfully in 3 seconds.
+
+same for 2
+
+3: solved with score of 794/1000 with some boxes left in 2 seconds.
+
+
+
+20x20x20:
+
+1st case: 22 seconds, 4445/8000. 8 boxes left
+2nd case: 19 seconds, 5746/8000. 14 boxes left 
+3rd case: 20 seconds, 5625/8000. 27 boxes left
+
+30x30x30:
+
+1st case: 2 minutes 5 seconds, 4hard/-100medium/25000soft / 270000. 26 boxes left.
+2nd case: 2 minutes 45 seconds, 0hard/-25medium/3900soft  / 27000. a lot of boxes left. very bad solution.
+
+
+Interestingly, when I lower the number between 0 and 1 that determines what fraction of the surface area of all boxes 
+should be supported by either ground or another box, the total number of airunits filled consistently goes down.
+I displayed all solutions using or webapp. In most of the solutions it seemed like more space could be filled.

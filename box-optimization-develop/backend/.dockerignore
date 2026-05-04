@@ -1,0 +1,17 @@
+# Ignore a folder at any depth
+**/target
+
+# Ignore specific file types
+*.log
+*.class
+*.jar
+
+# Ignore folders
+.idea/
+.vscode/
+timefold/test/
+timefold/boxSets/
+
+# Ignore hidden system files
+.DS_Store
+Thumbs.db

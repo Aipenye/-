@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wms.mapper.WorkOrderMapper">
+
+    <resultMap id="WorkOrderResultMap" type="com.wms.entity.WorkOrder">
+        <id column="id" property="id"/>
+        <result column="goods_id" property="goodsId"/>
+        <result column="storage_id" property="storageId"/>
+        <result column="count" property="count"/>
+        <result column="type" property="type"/>
+        <result column="deadline" property="deadline"/>
+        <result column="remark" property="remark"/>
+        <result column="admin_id" property="adminId"/>
+        <result column="worker_id" property="workerId"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="finish_time" property="finishTime"/>
+        <result column="goodsName" property="goodsName"/>
+        <result column="storageName" property="storageName"/>
+        <result column="adminName" property="adminName"/>
+        <result column="workerName" property="workerName"/>
+    </resultMap>
+
+    <select id="listWithDetail" resultMap="WorkOrderResultMap">
+        SELECT w.*, g.name AS goodsName, s.name AS storageName,
+               a.name AS adminName, u.name AS workerName
+        FROM work_order w
+        LEFT JOIN goods g ON w.goods_id = g.id
+        LEFT JOIN storage s ON w.storage_id = s.id
+        LEFT JOIN user a ON w.admin_id = a.id
+        LEFT JOIN user u ON w.worker_id = u.id
+        <where>
+            <if test="workerId != null">AND w.worker_id = #{workerId}</if>
+            <if test="status != null and status >= 0">AND w.status = #{status}</if>
+        </where>
+        ORDER BY w.create_time DESC
+    </select>
+
+</mapper>

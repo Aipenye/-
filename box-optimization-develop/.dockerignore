@@ -1,0 +1,37 @@
+# Global ignores
+.git
+*.log
+*.swp
+*.swo
+*.bak
+*.iml
+.idea
+.vscode
+.DS_Store
+Thumbs.db
+
+docker-compose.override.yml
+dockerignore.yml
+
+# Frontend build + deps
+frontend/node_modules
+frontend/dist
+frontend/.vite
+frontend/.eslintcache
+frontend/coverage
+frontend/mock/
+frontend/__mocks__/
+frontend/src/test/
+
+# Backend build artifacts
+backend/**/target
+backend/**/.idea
+backend/**/.classpath
+backend/**/.project
+backend/**/.settings
+
+# Java binaries
+*.class
+*.jar
+*.war
+*.ear

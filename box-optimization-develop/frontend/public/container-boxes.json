@@ -1,0 +1,24 @@
+{
+    "container": {
+      "id": "1",
+      "name": "container-1",
+      "xbound": 10,
+      "ybound": 10, 
+      "zbound": 10
+
+    },
+    "boxes": [
+      {
+        "id": "box1",
+        "length": 2,
+        "width": 2,
+        "height": 2,
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    ],
+    "score": null,
+    "solverStatus": null,
+    "airCubes": []
+  }

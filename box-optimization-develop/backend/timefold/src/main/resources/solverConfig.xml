@@ -1,0 +1,18 @@
+<solver xmlns="https://timefold.ai/xsd/solver" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="https://timefold.ai/xsd/solver https://timefold.ai/xsd/solver/solver.xsd">
+    <!-- Define the model -->
+    <solutionClass>org.acme.timefold.domain.BoxPlan</solutionClass>
+    <entityClass>org.acme.timefold.domain.Box</entityClass>
+    <!-- Define the score function -->
+    <scoreDirectorFactory>
+        <constraintProviderClass>org.acme.timefold.solver.BedAllocationConstraintProvider</constraintProviderClass>
+    </scoreDirectorFactory>
+    <!-- make greedy -->
+    <constructionHeuristic>
+        <constructionHeuristicType>FIRST_FIT</constructionHeuristicType>
+    </constructionHeuristic>
+    <!--<termination>
+    </termination>
+    <localSearch>
+    </localSearch> -->
+</solver> 

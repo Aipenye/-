@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+.vite
+__mocks__/
+src/test/
+*.log
+*.test.jsx
+.DS_Store
+.vscode
+.idea

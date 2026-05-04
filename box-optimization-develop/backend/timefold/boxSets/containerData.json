@@ -1,0 +1,36 @@
+{
+  "container": {
+    "id": "1",
+    "name": "container-1",
+    "xbound": 10,
+    "ybound": 10,
+    "zbound": 10,
+    "airCubes": []
+  },
+  "boxes": [
+    {
+      "id": "box1",
+      "length": 2,
+      "width": 2,
+      "height": 2,
+      "name": "box1",
+      "airCube": null,
+      "stable": false,
+      "x": null,
+      "y": null,
+      "z": null
+    },
+    {
+      "id": "box2",
+      "length": 2,
+      "width": 2,
+      "height": 2,
+      "name": "box2",
+      "airCube": null,
+      "stable": false,
+      "x": null,
+      "y": null,
+      "z": null
+    }
+  ]
+}
