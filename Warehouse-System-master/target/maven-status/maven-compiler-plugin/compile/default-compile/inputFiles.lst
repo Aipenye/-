@@ -1,9 +1,11 @@
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\common\CorsConfig.java
+G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\entity\BoxLayout.java
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\xlrit\boxoptimization\model\Coordinateable.java
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\controller\StorageController.java
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\service\MenuService.java
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\xlrit\boxoptimization\services\ItemOptimizerService.java
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\xlrit\boxoptimization\model\Warehouse.java
+G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\service\BoxLayoutService.java
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\agv\entity\SimWorker.java
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\agv\dto\SimStateDTO.java
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\common\CodeGenerator.java
@@ -27,6 +29,7 @@ G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\controller\Record
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\agv\ws\AgvWebSocketConfig.java
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\xlrit\boxoptimization\model\OptimizedResult.java
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\xlrit\boxoptimization\mappers\SkjolberMapper.java
+G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\service\BoxOptimizationService.java
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\service\Impl\UserServiceImpl.java
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\agv\engine\AgvSimulationEngine.java
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\common\AutoFillMetaInfoHandler.java
@@ -53,8 +56,10 @@ G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\xlrit\boxoptimization
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\agv\ws\AgvStatePublisher.java
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\agv\dto\WorkerDTO.java
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\common\MybatisPlusConfig.java
+G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\mapper\BoxLayoutMapper.java
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\service\GoodstypeService.java
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\xlrit\boxoptimization\model\Container.java
+G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\service\Impl\BoxLayoutServiceImpl.java
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\controller\GoodstypeController.java
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\entity\Storage.java
 G:\bishe\xiangMu\Warehouse-System-master\src\main\java\com\wms\mapper\MenuMapper.java

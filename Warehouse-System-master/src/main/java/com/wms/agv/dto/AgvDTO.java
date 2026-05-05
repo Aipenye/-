@@ -12,5 +12,7 @@ public class AgvDTO {
     private double speed;
     private String state;
     private boolean loaded;
-    private List<double[]> path; // 剩余路径点，用于前端绘制
+    private List<double[]> path;
+    private int currentOrderId;
+    private int targetSlot;
 }

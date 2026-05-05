@@ -14,11 +14,15 @@ import java.util.List;
 public class SensorSimulator {
 
     private static final double DETECT_RADIUS = 5.0;
-    private static final double HALF_FOV_DEG  = 105.0; // 210° / 2
+    private static final double HALF_FOV_DEG  = 105.0;
 
-    public record Detection(double distance) {}
+    /**
+     * agvId = -1 表示工人，>0 表示对方 AGV 的 ID
+     */
+    public record Detection(double distance, int agvId) {
+        public boolean isAgv() { return agvId > 0; }
+    }
 
-    /** 检测工人和其他 AGV，合并返回 */
     public List<Detection> detect(AgvEntity agv, List<SimWorker> workers, List<AgvEntity> otherAgvs) {
         List<Detection> result = new ArrayList<>();
 
@@ -28,17 +32,17 @@ public class SensorSimulator {
             double dist = Math.sqrt(dx * dx + dy * dy);
             if (dist > DETECT_RADIUS) continue;
             double diff = Math.abs(normalizeAngle(Math.toDegrees(Math.atan2(dy, dx)) - agv.getAngle()));
-            if (diff <= HALF_FOV_DEG) result.add(new Detection(dist));
+            if (diff <= HALF_FOV_DEG) result.add(new Detection(dist, -1));
         }
 
         for (AgvEntity other : otherAgvs) {
             double dx = other.getX() - agv.getX();
             double dy = other.getY() - agv.getY();
             double dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < 0.01) continue; // 同一位置跳过（初始化重叠时防止误触发）
+            if (dist < 0.01) continue;
             if (dist > DETECT_RADIUS) continue;
             double diff = Math.abs(normalizeAngle(Math.toDegrees(Math.atan2(dy, dx)) - agv.getAngle()));
-            if (diff <= HALF_FOV_DEG) result.add(new Detection(dist));
+            if (diff <= HALF_FOV_DEG) result.add(new Detection(dist, other.getId()));
         }
 
         return result;

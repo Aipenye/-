@@ -17,17 +17,29 @@ public class AStarPathfinder {
     }
 
     public List<double[]> findPath(double startX, double startY, double goalX, double goalY) {
+        return findPath(startX, startY, goalX, goalY, null);
+    }
+
+    public List<double[]> findPath(double startX, double startY, double goalX, double goalY,
+                                   java.util.Set<Integer> tempObstacles) {
         int sc = map.meterToCol(startX), sr = map.meterToRow(startY);
         int gc = map.meterToCol(goalX),  gr = map.meterToRow(goalY);
 
-        if (map.isObstacle(gc, gr)) {
-            // 目标在障碍内，寻找最近可通行格
-            int[] nearest = findNearestFree(gc, gr);
+        // 起点在障碍内时，移到最近的空闲格
+        if (isBlocked(sc, sr, tempObstacles)) {
+            int[] nearest = findNearestFree(sc, sr, tempObstacles);
+            if (nearest == null) return Collections.emptyList();
+            sc = nearest[0]; sr = nearest[1];
+        }
+
+        // 目标在障碍内时，移到最近的空闲格
+        if (isBlocked(gc, gr, tempObstacles)) {
+            int[] nearest = findNearestFree(gc, gr, tempObstacles);
             if (nearest == null) return Collections.emptyList();
             gc = nearest[0]; gr = nearest[1];
         }
 
-        if (sc == gc && sr == gr) return List.of(new double[]{goalX, goalY});
+        if (sc == gc && sr == gr) return List.of(new double[]{map.colToMeter(gc), map.rowToMeter(gr)});
 
         int total = WarehouseMap.COLS * WarehouseMap.ROWS;
         double[] g = new double[total];
@@ -55,12 +67,13 @@ public class AStarPathfinder {
             closed[ci] = true;
 
             if (cc == gc && cr == gr) {
-                return reconstructPath(parent, gc, gr, goalX, goalY);
+                return reconstructPath(parent, gc, gr,
+                        map.colToMeter(gc), map.rowToMeter(gr));
             }
 
             for (int[] d : dirs) {
                 int nc = cc + d[0], nr = cr + d[1];
-                if (map.isObstacle(nc, nr)) continue;
+                if (isBlocked(nc, nr, tempObstacles)) continue;
                 int ni = idx(nc, nr);
                 if (closed[ni]) continue;
 
@@ -74,7 +87,7 @@ public class AStarPathfinder {
                 }
             }
         }
-        return Collections.emptyList(); // 无路径
+        return Collections.emptyList();
     }
 
     private List<double[]> reconstructPath(int[] parent, int gc, int gr, double goalX, double goalY) {
@@ -117,16 +130,26 @@ public class AStarPathfinder {
     }
 
     private int[] findNearestFree(int gc, int gr) {
+        return findNearestFree(gc, gr, null);
+    }
+
+    private int[] findNearestFree(int gc, int gr, java.util.Set<Integer> tempObstacles) {
         for (int r = 1; r <= 10; r++) {
             for (int dc = -r; dc <= r; dc++) {
                 for (int dr = -r; dr <= r; dr++) {
                     if (Math.abs(dc) != r && Math.abs(dr) != r) continue;
                     int nc = gc + dc, nr = gr + dr;
-                    if (!map.isObstacle(nc, nr)) return new int[]{nc, nr};
+                    if (!isBlocked(nc, nr, tempObstacles)) return new int[]{nc, nr};
                 }
             }
         }
         return null;
+    }
+
+    private boolean isBlocked(int col, int row, java.util.Set<Integer> tempObstacles) {
+        if (map.isObstacle(col, row)) return true;
+        if (tempObstacles == null || tempObstacles.isEmpty()) return false;
+        return tempObstacles.contains(col * 1000 + row);
     }
 
     private double heuristic(int c1, int r1, int c2, int r2) {

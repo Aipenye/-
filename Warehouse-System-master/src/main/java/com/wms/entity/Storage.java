@@ -29,4 +29,6 @@ public class Storage implements Serializable {
 
     private Double width;
 
+    /** AGV货架编号(1-48)，对应仓库地图中的货架格子，NULL表示未注册 */
+    private Integer agvSlot;
 }

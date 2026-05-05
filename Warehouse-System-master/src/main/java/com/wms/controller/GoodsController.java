@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wms.common.QueryPageParam;
 import com.wms.common.Result;
 import com.wms.entity.Goods;
+import com.wms.service.BoxOptimizationService;
 import com.wms.service.GoodsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -15,25 +16,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 
-/**
- * <p>
- *  前端控制器：物品管理
- * </p>
- *
- * @author linsuwen
- * @since 2023-01-06
- */
 @RestController
 @RequestMapping("/goods")
 public class GoodsController {
-    @Autowired
-    private GoodsService goodsService;
-    
-    /*
-     * 新增物品
-     * @author linsuwen
-     * @date 2023/1/6 12:12
-     */
+    @Autowired private GoodsService           goodsService;
+    @Autowired private BoxOptimizationService boxOptimizationService;
+
     @GetMapping("/list")
     public Result list(){
         return Result.success(goodsService.list());
@@ -41,34 +29,43 @@ public class GoodsController {
 
     @PostMapping("/save")
     public Result save(@RequestBody Goods goods){
-        return goodsService.save(goods)?Result.success():Result.fail();
+        boolean ok = goodsService.save(goods);
+        if (ok && goods.getStorage() != null) {
+            boxOptimizationService.optimizeAndSave(goods.getStorage());
+        }
+        return ok ? Result.success() : Result.fail();
     }
 
-    /*
-     * 更新物品
-     * @author linsuwen
-     * @date 2023/1/6 13:22
-     */
     @PostMapping("/update")
     public Result update(@RequestBody Goods goods){
-        return goodsService.updateById(goods)?Result.success():Result.fail();
+        // 取旧记录，确保能拿到 storageId（前端可能只传部分字段）
+        Goods old = goodsService.getById(goods.getId());
+        boolean ok = goodsService.updateById(goods);
+        if (ok) {
+            Integer storageId = goods.getStorage() != null ? goods.getStorage()
+                    : (old != null ? old.getStorage() : null);
+            if (storageId != null) {
+                boxOptimizationService.optimizeAndSave(storageId);
+            }
+            // 若货物被移到了另一个仓库，旧仓库也需要重算
+            if (old != null && old.getStorage() != null
+                    && !old.getStorage().equals(storageId)) {
+                boxOptimizationService.optimizeAndSave(old.getStorage());
+            }
+        }
+        return ok ? Result.success() : Result.fail();
     }
 
-    /*
-     * 删除物品
-     * @author linsuwen
-     * @date 2023/1/6 13:24
-     */
     @GetMapping("/del")
     public Result del(@RequestParam String id){
-        return goodsService.removeById(id)?Result.success():Result.fail();
+        Goods goods = goodsService.getById(id);
+        boolean ok = goodsService.removeById(id);
+        if (ok && goods != null && goods.getStorage() != null) {
+            boxOptimizationService.optimizeAndSave(goods.getStorage());
+        }
+        return ok ? Result.success() : Result.fail();
     }
 
-    /*
-     * 模糊查询：根据输入查询物品并以分页的形式展示
-     * @author linsuwen
-     * @date 2023/1/6 13:31
-     */
     @PostMapping("/listPage")
     public Result listPage(@RequestBody QueryPageParam query){
         HashMap param = query.getParam();
@@ -95,3 +92,4 @@ public class GoodsController {
         return Result.success(result.getRecords(),result.getTotal());
     }
 }
+

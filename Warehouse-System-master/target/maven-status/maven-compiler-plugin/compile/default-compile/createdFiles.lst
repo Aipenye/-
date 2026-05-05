@@ -1,3 +1,4 @@
+com\wms\mapper\BoxLayoutMapper.class
 com\wms\controller\RecordController.class
 com\wms\agv\engine\WarehouseMap.class
 com\wms\common\CodeGenerator.class
@@ -11,6 +12,7 @@ com\wms\entity\Record.class
 com\wms\agv\dto\AgvDTO.class
 com\wms\agv\entity\WorkerMode.class
 com\wms\controller\GoodstypeController.class
+com\wms\service\BoxLayoutService.class
 com\wms\agv\engine\AgvSimulationEngine.class
 com\wms\WarehouseSystemApplication.class
 com\wms\entity\Goodstype.class
@@ -19,6 +21,7 @@ com\xlrit\boxoptimization\controller\OptimizerController.class
 com\wms\agv\entity\SimWorker.class
 com\wms\mapper\RecordMapper.class
 com\wms\mapper\GoodstypeMapper.class
+com\wms\service\Impl\BoxLayoutServiceImpl.class
 com\wms\agv\entity\AgvEntity.class
 com\wms\service\GoodstypeService.class
 com\xlrit\boxoptimization\model\OptimizedResult.class
@@ -40,6 +43,7 @@ com\xlrit\boxoptimization\algorithms\SolvingStrategy.class
 com\wms\agv\entity\WorkerState.class
 com\wms\entity\User.class
 com\wms\service\RecordService.class
+com\wms\service\BoxOptimizationService.class
 com\wms\service\Impl\UserServiceImpl.class
 com\xlrit\boxoptimization\model\Dimensionable.class
 com\wms\agv\ws\AgvWebSocketConfig.class
@@ -47,6 +51,7 @@ com\wms\service\Impl\StorageServiceImpl.class
 com\wms\entity\RecordRes.class
 com\wms\service\Impl\MenuServiceImpl.class
 com\xlrit\boxoptimization\model\Container.class
+com\wms\entity\BoxLayout.class
 com\wms\entity\Menu.class
 com\wms\common\AutoFillMetaInfoHandler.class
 com\xlrit\boxoptimization\algorithms\TimefoldStrategy.class

@@ -7,6 +7,8 @@ import com.wms.common.Result;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -43,15 +45,49 @@ public class AgvSimController {
         ));
     }
 
-    /** 返回仓库静态地图数据（货架、禁区），前端初始化时调用一次 */
+    /** 返回仓库静态地图数据，包含货架注册状态、出口、停车区 */
     @GetMapping("/map")
     public Result mapData() {
-        return Result.success(Map.of(
-            "widthM",    WarehouseMap.WIDTH_M,
-            "heightM",   WarehouseMap.HEIGHT_M,
-            "cellSize",  WarehouseMap.CELL_SIZE,
-            "shelves",   map.getShelfRects(),
-            "humanZones",map.getHumanZones()
+        // 构建货架信息列表（含编号和注册状态）
+        List<Map<String, Object>> shelfInfoList = new ArrayList<>();
+        map.getSlotRectMap().forEach((slot, rect) -> {
+            shelfInfoList.add(Map.of(
+                "slot",       slot,
+                "rect",       rect,
+                "registered", map.isRegistered(slot)
+            ));
+        });
+
+        return Result.success(Map.ofEntries(
+            Map.entry("widthM",       WarehouseMap.WIDTH_M),
+            Map.entry("heightM",      WarehouseMap.HEIGHT_M),
+            Map.entry("cellSize",     WarehouseMap.CELL_SIZE),
+            Map.entry("shelves",      map.getShelfRects()),
+            Map.entry("humanZones",   map.getHumanZones()),
+            Map.entry("shelfInfos",   shelfInfoList),
+            Map.entry("exitX1",       WarehouseMap.EXIT_X1),
+            Map.entry("exitX2",       WarehouseMap.EXIT_X2),
+            Map.entry("exitY",        WarehouseMap.EXIT_Y),
+            Map.entry("leftParkX1",   WarehouseMap.LEFT_PARK_X1),
+            Map.entry("leftParkX2",   WarehouseMap.LEFT_PARK_X2),
+            Map.entry("rightParkX1",  WarehouseMap.RIGHT_PARK_X1),
+            Map.entry("rightParkX2",  WarehouseMap.RIGHT_PARK_X2),
+            Map.entry("parkY1",       WarehouseMap.PARK_Y1),
+            Map.entry("parkY2",       WarehouseMap.PARK_Y2),
+            Map.entry("parkSlots",    WarehouseMap.PARK_SLOTS)
         ));
+    }
+
+    /** 同步货架注册状态（仓库增删后调用） */
+    @PostMapping("/syncSlots")
+    public Result syncSlots() {
+        engine.syncStorageSlots();
+        return Result.success("货架状态已同步");
+    }
+
+    /** 查询空闲AGV数量 */
+    @GetMapping("/idleCount")
+    public Result idleCount() {
+        return Result.success(engine.countIdleAgvs());
     }
 }

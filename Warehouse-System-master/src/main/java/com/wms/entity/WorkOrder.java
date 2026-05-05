@@ -31,6 +31,12 @@ public class WorkOrder implements Serializable {
 
     private Integer workerId;
 
+    /** 指派对象：0=工人，1=AGV */
+    private Integer assignedTo;
+
+    /** 指派的AGV编号（assignedTo=1时有效） */
+    private Integer agvId;
+
     private Integer status;
 
     private Integer type;

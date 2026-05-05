@@ -201,6 +201,10 @@ function App() {
             if (data.goodsList) {
               setGoodsList(data.goodsList);
             }
+            // 若有预计算结果，直接渲染3D模型，无需重新计算
+            if (data.precomputed && wh) {
+              setModelData(data);
+            }
           }
         })
         .catch(err => console.error("加载仓库数据失败:", err));

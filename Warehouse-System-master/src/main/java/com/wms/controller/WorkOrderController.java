@@ -1,5 +1,6 @@
 package com.wms.controller;
 
+import com.wms.agv.engine.AgvSimulationEngine;
 import com.wms.common.Result;
 import com.wms.entity.Goods;
 import com.wms.entity.Record;
@@ -22,28 +23,27 @@ import java.util.List;
 @RequestMapping("/workorder")
 public class WorkOrderController {
 
-    @Autowired private WorkOrderService workOrderService;
-    @Autowired private GoodsService goodsService;
-    @Autowired private RecordService recordService;
-    @Autowired private StorageService storageService;
-    @Autowired private UserService userService;
+    @Autowired private WorkOrderService    workOrderService;
+    @Autowired private GoodsService        goodsService;
+    @Autowired private RecordService       recordService;
+    @Autowired private StorageService      storageService;
+    @Autowired private UserService         userService;
+    @Autowired private AgvSimulationEngine agvEngine;
 
     @PostMapping("/save")
     public Result save(@RequestBody WorkOrder workOrder) {
-        Goods goods = goodsService.getById(workOrder.getGoodsId());
+        Goods goods     = goodsService.getById(workOrder.getGoodsId());
         Storage storage = storageService.getById(workOrder.getStorageId());
 
+        // 库存/容量校验
         if (workOrder.getType() != null && workOrder.getType() == 1) {
-            // 出库：检查货物库存
             int stock = (goods == null || goods.getCount() == null) ? 0 : goods.getCount();
             if (stock < workOrder.getCount()) {
                 return Result.fail("货物库存不足，当前库存：" + stock);
             }
         } else {
-            // 入库：检查仓库剩余容量
             if (storage != null && storage.getCapacity() != null && storage.getCapacity() > 0) {
-                int used = (storage.getUsed() == null) ? 0 : storage.getUsed();
-                int remaining = storage.getCapacity() - used;
+                int remaining = storage.getCapacity() - (storage.getUsed() == null ? 0 : storage.getUsed());
                 if (remaining < workOrder.getCount()) {
                     return Result.fail("仓库容量不足，剩余容量：" + remaining);
                 }
@@ -53,17 +53,39 @@ public class WorkOrderController {
         workOrder.setStatus(0);
         workOrder.setCreateTime(LocalDateTime.now());
         workOrder.setWorkerId(null);
+        workOrder.setAgvId(null);
 
-        User worker = findIdleWorker();
-        if (worker != null) {
-            workOrder.setWorkerId(worker.getId());
+        int assignedTo = workOrder.getAssignedTo() == null ? 0 : workOrder.getAssignedTo();
+        workOrder.setAssignedTo(assignedTo);
+
+        if (assignedTo == 1) {
+            // 指派给AGV
+            if (storage == null || storage.getAgvSlot() == null) {
+                return Result.fail("该仓库未注册AGV货架位，无法指派给AGV");
+            }
             workOrderService.save(workOrder);
-            worker.setWorkStatus(2);
-            userService.updateById(worker);
-            return Result.success("工单已派发给工人：" + worker.getName());
+            // 尝试立即分配给空闲AGV
+            int agvId = agvEngine.assignOrderToAgv(workOrder.getId());
+            if (agvId > 0) {
+                workOrder.setAgvId(agvId);
+                workOrderService.updateById(workOrder);
+                return Result.success("工单已派发给 AGV-" + agvId);
+            } else {
+                return Result.success("工单已创建，等待AGV空闲后自动执行");
+            }
         } else {
-            workOrderService.save(workOrder);
-            return Result.success("暂无空闲工人，工单已进入缓冲池");
+            // 指派给工人
+            User worker = findIdleWorker();
+            if (worker != null) {
+                workOrder.setWorkerId(worker.getId());
+                workOrderService.save(workOrder);
+                worker.setWorkStatus(2);
+                userService.updateById(worker);
+                return Result.success("工单已派发给工人：" + worker.getName());
+            } else {
+                workOrderService.save(workOrder);
+                return Result.success("暂无空闲工人，工单已进入缓冲池");
+            }
         }
     }
 
@@ -78,6 +100,11 @@ public class WorkOrderController {
     public Result finish(@RequestParam Integer id) {
         WorkOrder workOrder = workOrderService.getById(id);
         if (workOrder == null) return Result.fail();
+
+        // AGV工单由引擎自动完成，此接口仅供工人工单使用
+        if (workOrder.getAssignedTo() != null && workOrder.getAssignedTo() == 1) {
+            return Result.fail("AGV工单由系统自动完成");
+        }
 
         int delta = (workOrder.getType() != null && workOrder.getType() == 1)
                 ? -workOrder.getCount() : workOrder.getCount();
@@ -115,6 +142,7 @@ public class WorkOrderController {
                 WorkOrder pending = workOrderService.lambdaQuery()
                         .isNull(WorkOrder::getWorkerId)
                         .eq(WorkOrder::getStatus, 0)
+                        .eq(WorkOrder::getAssignedTo, 0)
                         .orderByAsc(WorkOrder::getCreateTime)
                         .last("LIMIT 1")
                         .one();

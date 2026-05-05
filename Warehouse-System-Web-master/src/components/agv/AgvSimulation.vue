@@ -3,11 +3,6 @@
     <!-- 控制栏 -->
     <div class="ctrl-bar">
       <span class="page-title">AGV 仿真监控</span>
-      <div class="ctrl-btns">
-        <el-button type="success"  size="small" :disabled="simRunning"  @click="startSim">启动</el-button>
-        <el-button type="warning"  size="small" :disabled="!simRunning" @click="stopSim">暂停</el-button>
-        <el-button type="danger"   size="small" @click="resetSim">重置</el-button>
-      </div>
       <div class="conn-status" :class="connected ? 'conn-ok' : 'conn-err'">
         {{ connected ? '● 已连接' : '○ 未连接' }}
       </div>
@@ -32,6 +27,10 @@
             </div>
             <div class="agv-pos">X:{{ agv.x.toFixed(1) }}m  Y:{{ agv.y.toFixed(1) }}m</div>
             <div class="agv-speed">速度: {{ agv.speed.toFixed(2) }} m/s</div>
+            <div v-if="agv.currentOrderId >= 0" class="agv-task">
+              工单#{{ agv.currentOrderId }}
+              <span v-if="agv.targetSlot > 0">→ 货架#{{ agv.targetSlot }}</span>
+            </div>
           </div>
           <div v-if="agvList.length === 0" class="empty-tip">仿真未启动</div>
         </div>
@@ -50,8 +49,11 @@
 
         <div class="panel-section legend-section">
           <div class="section-title">图例</div>
-          <div class="legend-item"><span class="leg-box shelf"></span>货架</div>
+          <div class="legend-item"><span class="leg-box shelf"></span>已注册货架</div>
+          <div class="legend-item"><span class="leg-box shelf-unused"></span>未注册货架</div>
           <div class="legend-item"><span class="leg-box human-zone"></span>人工通道（禁区）</div>
+          <div class="legend-item"><span class="leg-box exit-zone"></span>仓库出口</div>
+          <div class="legend-item"><span class="leg-box park-zone"></span>AGV停车区</div>
           <div class="legend-item"><span class="leg-box agv-run"></span>AGV 正常行驶</div>
           <div class="legend-item"><span class="leg-box agv-cau"></span>AGV 减速</div>
           <div class="legend-item"><span class="leg-box agv-stop"></span>AGV 急停</div>
@@ -72,7 +74,8 @@ const STATE_COLORS = {
   CAUTION:        '#e6a817',
   EMERGENCY_STOP: '#e74c3c',
   LIFTING:        '#3498db',
-  WAITING_LOCK:   '#9b59b6'
+  WAITING_LOCK:   '#9b59b6',
+  RETURNING:      '#1abc9c'
 }
 
 export default {
@@ -83,18 +86,16 @@ export default {
       simRunning: false,
       agvList: [],
       workerList: [],
-      // 地图静态数据
       mapData: null,
-      // 画布变换
+      // 仓库名称映射：agvSlot → {name, used, capacity}
+      storageSlotMap: {},
       scale: 1,
       offsetX: 0,
       offsetY: 0,
       dragging: false,
       dragStart: null,
-      // 动画帧
       animFrame: null,
       stompClient: null,
-      // 静态层离屏 canvas
       staticCanvas: null
     }
   },
@@ -139,6 +140,19 @@ export default {
           this.drawFrame()
         }
       })
+      // 加载仓库列表，建立 agvSlot → 仓库信息 映射
+      this.$axios.get(this.$httpUrl + '/storage/list').then(res => {
+        const list = res.data.data || []
+        const map = {}
+        list.forEach(s => {
+          if (s.agvSlot != null) {
+            map[s.agvSlot] = { name: s.name, used: s.used || 0, capacity: s.capacity || 0 }
+          }
+        })
+        this.storageSlotMap = map
+        this.staticCanvas = null
+        this.drawFrame()
+      })
     },
 
     // ── WebSocket ────────────────────────────────────────────
@@ -179,13 +193,8 @@ export default {
 
     // ── 渲染 ─────────────────────────────────────────────────
     buildStaticLayer() {
-      if (!this.mapData) return
-      const c = document.createElement('canvas')
-      c.width  = this.$refs.canvas.width
-      c.height = this.$refs.canvas.height
-      const ctx = c.getContext('2d')
-      this.drawStatic(ctx)
-      this.staticCanvas = c
+      // 清除缓存，下次 drawFrame 时重建（确保 storageSlotMap 已加载）
+      this.staticCanvas = null
     },
 
     drawFrame() {
@@ -211,7 +220,9 @@ export default {
 
     drawStatic(ctx) {
       if (!this.mapData) return
-      const { shelves, humanZones, widthM, heightM } = this.mapData
+      const { humanZones, widthM, heightM, exitX1, exitX2, exitY,
+              leftParkX1, leftParkX2, rightParkX1, rightParkX2,
+              parkY1, parkY2, shelfInfos } = this.mapData
 
       // 仓库地面
       ctx.fillStyle = '#ecf0f1'
@@ -230,23 +241,98 @@ export default {
 
       // 主干道标记（浅蓝）
       ctx.fillStyle = 'rgba(52,152,219,0.10)'
-      // 水平主干道
       ctx.fillRect(...this.rect(0, 18.25, 80, 3.5))
-      // 垂直主干道
       ctx.fillRect(...this.rect(38.25, 0, 3.5, 40))
 
-      // 货架
-      ctx.fillStyle = '#7f8c8d'
-      ctx.strokeStyle = '#5d6d7e'
-      ctx.lineWidth = 1
-      for (const s of shelves) {
-        const r = this.rect(s[0], s[1], s[2] - s[0], s[3] - s[1])
-        ctx.fillRect(...r)
-        ctx.strokeRect(...r)
+      // 出口区域
+      const ex1 = exitX1 != null ? exitX1 : 37.5
+      const ex2 = exitX2 != null ? exitX2 : 42.5
+      const exitW = ex2 - ex1
+      const exitH = 1.5
+      const exitTop = exitY != null ? exitY : 0
+      ctx.fillStyle = 'rgba(46,204,113,0.35)'
+      ctx.fillRect(...this.rect(ex1, exitTop, exitW, exitH))
+      ctx.strokeStyle = '#27ae60'
+      ctx.lineWidth = 2
+      ctx.strokeRect(...this.rect(ex1, exitTop, exitW, exitH))
+      const [exCx, exCy] = this.toCanvas(ex1 + exitW / 2, exitTop + exitH / 2)
+      ctx.fillStyle = '#1a7a40'
+      ctx.font = `bold ${Math.max(10, this.scale * 0.9)}px sans-serif`
+      ctx.textAlign = 'center'
+      ctx.fillText('出口', exCx, exCy + 4)
+
+      // 左侧停车区
+      const lx1 = leftParkX1 != null ? leftParkX1 : 32.5
+      const lx2 = leftParkX2 != null ? leftParkX2 : 37.5
+      const py1 = parkY1 != null ? parkY1 : 1.5
+      const py2 = parkY2 != null ? parkY2 : 4.0
+      const pH = py2 - py1
+      this.drawParkZone(ctx, lx1, py1, lx2 - lx1, pH, '左停车区')
+
+      // 右侧停车区
+      const rx1 = rightParkX1 != null ? rightParkX1 : 42.5
+      const rx2 = rightParkX2 != null ? rightParkX2 : 47.5
+      this.drawParkZone(ctx, rx1, py1, rx2 - rx1, pH, '右停车区')
+
+      // 货架（含标注）
+      const infos = shelfInfos || []
+      for (const info of infos) {
+        const r = info.rect  // [x1,y1,x2,y2]
+        const w = r[2] - r[0], h = r[3] - r[1]
+        const canvasR = this.rect(r[0], r[1], w, h)
+
+        if (info.registered) {
+          ctx.fillStyle = '#7f8c8d'
+        } else {
+          ctx.fillStyle = '#b2bec3'
+        }
+        ctx.strokeStyle = '#5d6d7e'
+        ctx.lineWidth = 1
+        ctx.fillRect(...canvasR)
+        ctx.strokeRect(...canvasR)
+
+        // 货架标注文字
+        const [cx, cy] = this.toCanvas(r[0] + w / 2, r[1] + h / 2)
+        const fontSize = Math.max(7, Math.min(this.scale * 0.65, 11))
+        ctx.font = `${fontSize}px sans-serif`
+        ctx.textAlign = 'center'
+
+        if (info.registered) {
+          const sInfo = this.storageSlotMap[info.slot]
+          if (sInfo) {
+            const pct = sInfo.capacity > 0
+              ? Math.round(sInfo.used / sInfo.capacity * 100) : 0
+            ctx.fillStyle = '#fff'
+            ctx.fillText(sInfo.name, cx, cy - fontSize * 0.6)
+            ctx.fillStyle = pct >= 90 ? '#e74c3c' : pct >= 60 ? '#e6a817' : '#ecf0f1'
+            ctx.fillText(sInfo.used + '/' + sInfo.capacity, cx, cy + fontSize * 0.8)
+          } else {
+            ctx.fillStyle = '#ecf0f1'
+            ctx.fillText('#' + info.slot, cx, cy + 4)
+          }
+        } else {
+          ctx.fillStyle = '#636e72'
+          ctx.fillText('暂未使用', cx, cy + 4)
+        }
       }
 
       // 坐标轴刻度
       this.drawGrid(ctx, widthM, heightM)
+    },
+
+    drawParkZone(ctx, x, y, w, h, label) {
+      ctx.fillStyle = 'rgba(155,89,182,0.18)'
+      ctx.fillRect(...this.rect(x, y, w, h))
+      ctx.strokeStyle = '#8e44ad'
+      ctx.lineWidth = 1.5
+      ctx.setLineDash([4, 3])
+      ctx.strokeRect(...this.rect(x, y, w, h))
+      ctx.setLineDash([])
+      const [cx, cy] = this.toCanvas(x + w / 2, y + h / 2)
+      ctx.fillStyle = '#6c3483'
+      ctx.font = `bold ${Math.max(9, this.scale * 0.75)}px sans-serif`
+      ctx.textAlign = 'center'
+      ctx.fillText(label, cx, cy + 4)
     },
 
     drawGrid(ctx, w, h) {
@@ -413,11 +499,12 @@ export default {
     // ── 辅助 ─────────────────────────────────────────────────
     stateLabel(s) {
       return { IDLE:'待机', RUNNING:'行驶', CAUTION:'减速', EMERGENCY_STOP:'急停',
-               LIFTING:'举升', WAITING_LOCK:'等待' }[s] || s
+               LIFTING:'举升', WAITING_LOCK:'等待', RETURNING:'返回' }[s] || s
     },
     stateClass(s) {
       return { IDLE:'s-idle', RUNNING:'s-run', CAUTION:'s-cau',
-               EMERGENCY_STOP:'s-stop', LIFTING:'s-lift', WAITING_LOCK:'s-wait' }[s] || ''
+               EMERGENCY_STOP:'s-stop', LIFTING:'s-lift', WAITING_LOCK:'s-wait',
+               RETURNING:'s-return' }[s] || ''
     }
   }
 }
@@ -462,11 +549,13 @@ export default {
   background: #f8f9fa; border-radius: 8px; padding: 8px 10px;
   margin-bottom: 8px; border-left: 3px solid #95a5a6;
 }
-.agv-card.s-run  { border-left-color: #27ae60; }
-.agv-card.s-cau  { border-left-color: #e6a817; }
-.agv-card.s-stop { border-left-color: #e74c3c; }
-.agv-card.s-lift { border-left-color: #3498db; }
-.agv-card.s-wait { border-left-color: #9b59b6; }
+.agv-card.s-run    { border-left-color: #27ae60; }
+.agv-card.s-cau    { border-left-color: #e6a817; }
+.agv-card.s-stop   { border-left-color: #e74c3c; }
+.agv-card.s-lift   { border-left-color: #3498db; }
+.agv-card.s-wait   { border-left-color: #9b59b6; }
+.agv-card.s-return { border-left-color: #1abc9c; }
+.agv-card.s-return { border-left-color: #1abc9c; }
 
 .agv-id    { font-size: 13px; font-weight: 700; color: #2c3e50; }
 .agv-info  { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
@@ -474,13 +563,15 @@ export default {
   font-size: 10px; padding: 1px 6px; border-radius: 8px;
   background: #ecf0f1; color: #7f8c8d;
 }
-.state-badge.s-run  { background: rgba(39,174,96,0.15);  color: #27ae60; }
-.state-badge.s-cau  { background: rgba(230,168,23,0.15); color: #e6a817; }
-.state-badge.s-stop { background: rgba(231,76,60,0.15);  color: #e74c3c; }
-.state-badge.s-lift { background: rgba(52,152,219,0.15); color: #3498db; }
-.state-badge.s-wait { background: rgba(155,89,182,0.15); color: #9b59b6; }
+.state-badge.s-run    { background: rgba(39,174,96,0.15);  color: #27ae60; }
+.state-badge.s-cau    { background: rgba(230,168,23,0.15); color: #e6a817; }
+.state-badge.s-stop   { background: rgba(231,76,60,0.15);  color: #e74c3c; }
+.state-badge.s-lift   { background: rgba(52,152,219,0.15); color: #3498db; }
+.state-badge.s-wait   { background: rgba(155,89,182,0.15); color: #9b59b6; }
+.state-badge.s-return { background: rgba(26,188,156,0.15); color: #1abc9c; }
 .agv-detail { font-size: 11px; color: #95a5a6; }
 .agv-pos, .agv-speed { font-size: 11px; color: #7f8c8d; }
+.agv-task { font-size: 11px; color: #2980b9; margin-top: 2px; }
 
 .worker-card {
   background: #f8f9fa; border-radius: 8px; padding: 8px 10px;
@@ -500,7 +591,10 @@ export default {
 .leg-box    { width: 14px; height: 14px; border-radius: 2px; flex-shrink: 0; }
 .leg-circle { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
 .shelf      { background: #7f8c8d; }
+.shelf-unused { background: #b2bec3; border: 1px dashed #636e72; }
 .human-zone { background: rgba(231,76,60,0.25); border: 1px solid #e74c3c; }
+.exit-zone  { background: rgba(46,204,113,0.35); border: 1px solid #27ae60; }
+.park-zone  { background: rgba(155,89,182,0.25); border: 1px dashed #8e44ad; }
 .agv-run    { background: #27ae60; }
 .agv-cau    { background: #e6a817; }
 .agv-stop   { background: #e74c3c; }

@@ -31,6 +31,11 @@ public class TrafficManager {
         return holder != null && holder != agvId;
     }
 
+    /** 释放所有通道锁（重置时调用） */
+    public void releaseAll() {
+        zoneLocks.clear();
+    }
+
     /**
      * 根据 AGV 当前坐标判断所在通道 ID
      * 作业通道（2.5m 宽）按货架列 x 范围 + 通道 y 范围编码

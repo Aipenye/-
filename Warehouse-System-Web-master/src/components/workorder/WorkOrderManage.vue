@@ -24,9 +24,17 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="指派对象" width="90">
+          <template slot-scope="scope">
+            <el-tag :type="scope.row.assignedTo===1?'primary':''" size="small" disable-transitions>
+              {{ scope.row.assignedTo===1 ? 'AGV' : '工人' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="指派工人">
           <template slot-scope="scope">
-            <span v-if="scope.row.workerName">{{ scope.row.workerName }}</span>
+            <span v-if="scope.row.assignedTo===1 && scope.row.agvId">AGV-{{ scope.row.agvId }}</span>
+            <span v-else-if="scope.row.workerName">{{ scope.row.workerName }}</span>
             <el-tag v-else type="info" size="small" disable-transitions>待分配</el-tag>
           </template>
         </el-table-column>
@@ -67,6 +75,12 @@
         <el-form-item label="数量" prop="count">
           <el-input-number v-model="form.count" :min="1" style="width:100%"/>
         </el-form-item>
+        <el-form-item label="指派给" prop="assignedTo">
+          <el-radio-group v-model="form.assignedTo">
+            <el-radio :label="0">工人</el-radio>
+            <el-radio :label="1">AGV小车</el-radio>
+          </el-radio-group>
+        </el-form-item>
         <el-form-item label="工单类型" prop="type">
           <el-radio-group v-model="form.type">
             <el-radio :label="0">入库</el-radio>
@@ -105,7 +119,7 @@ export default {
       dialogVisible: false,
       goodsList: [],
       storageList: [],
-      form: { goodsId: null, storageId: null, count: 1, type: 0, deadline: null, remark: '' },
+      form: { goodsId: null, storageId: null, count: 1, type: 0, assignedTo: 0, deadline: null, remark: '' },
       rules: {
         goodsId:   [{ required: true, message: '请选择货物', trigger: 'change' }],
         storageId: [{ required: true, message: '请选择货架', trigger: 'change' }],
@@ -133,7 +147,7 @@ export default {
     },
     openAdd() { this.dialogVisible = true },
     resetForm() {
-      this.form = { goodsId: null, storageId: null, count: 1, type: 0, deadline: null, remark: '' }
+      this.form = { goodsId: null, storageId: null, count: 1, type: 0, assignedTo: 0, deadline: null, remark: '' }
       this.$refs.form && this.$refs.form.clearValidate()
     },
     submit() {
