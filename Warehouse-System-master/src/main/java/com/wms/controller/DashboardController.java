@@ -87,16 +87,20 @@ public class DashboardController {
     }
 
     private List<Map<String, Object>> buildStorageUsage() {
-        List<Storage> storages = storageService.list();
+        List<Storage> storages = storageService.listAllWithUsedVolume();
         List<Map<String, Object>> list = new ArrayList<>();
         for (Storage s : storages) {
-            if (s.getCapacity() == null || s.getCapacity() <= 0) continue;
-            int used = (s.getUsed() == null) ? 0 : s.getUsed();
-            double rate = Math.round(used * 1000.0 / s.getCapacity()) / 10.0;
+            double len = s.getLength() == null ? 0 : s.getLength();
+            double hei = s.getHeight() == null ? 0 : s.getHeight();
+            double wid = s.getWidth()  == null ? 0 : s.getWidth();
+            double totalVolume = len * hei * wid;
+            if (totalVolume <= 0) continue;
+            double usedVolume = s.getUsedVolume() == null ? 0 : s.getUsedVolume();
+            double rate = Math.min(100.0, Math.round(usedVolume * 1000.0 / totalVolume) / 10.0);
             Map<String, Object> item = new HashMap<>();
             item.put("name", s.getName());
-            item.put("capacity", s.getCapacity());
-            item.put("used", used);
+            item.put("capacity", Math.round(totalVolume));
+            item.put("used", Math.round(usedVolume));
             item.put("rate", rate);
             list.add(item);
         }

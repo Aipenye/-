@@ -15,6 +15,20 @@
     </sql>
 
     <select id="pageCC" resultType="com.wms.entity.Storage">
-        select * from storage ${ew.customSqlSegment}
+        select s.*,
+               COALESCE((select sum(g.length * g.height * g.width * g.count)
+                         from goods g where g.storage = s.id
+                           and g.length is not null and g.height is not null and g.width is not null), 0)
+                   as usedVolume
+        from storage s ${ew.customSqlSegment}
+    </select>
+
+    <select id="listAllWithUsedVolume" resultType="com.wms.entity.Storage">
+        select s.*,
+               COALESCE((select sum(g.length * g.height * g.width * g.count)
+                         from goods g where g.storage = s.id
+                           and g.length is not null and g.height is not null and g.width is not null), 0)
+                   as usedVolume
+        from storage s
     </select>
 </mapper>

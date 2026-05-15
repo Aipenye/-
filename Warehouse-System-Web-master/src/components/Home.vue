@@ -90,8 +90,12 @@
       <template v-else>
         <el-table :data="detailData" size="small" stripe>
           <el-table-column prop="name" label="仓库名"/>
-          <el-table-column prop="capacity" label="总容量" width="90"/>
-          <el-table-column prop="used" label="已使用" width="90"/>
+          <el-table-column label="总容量(cm³)" width="130">
+            <template slot-scope="scope">{{ Number(scope.row.capacity).toLocaleString() }}</template>
+          </el-table-column>
+          <el-table-column label="已使用(cm³)" width="130">
+            <template slot-scope="scope">{{ Number(scope.row.used).toLocaleString() }}</template>
+          </el-table-column>
           <el-table-column label="占用率" width="100">
             <template slot-scope="scope">{{ scope.row.rate }}%</template>
           </el-table-column>

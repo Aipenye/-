@@ -14,16 +14,25 @@
             <el-table-column prop="id" label="ID" width="60"/>
             <el-table-column prop="name" label="仓库名" width="160"/>
             <el-table-column prop="remark" label="备注" width="160"/>
-            <el-table-column prop="capacity" label="总容量" width="90"/>
-            <el-table-column prop="used" label="已使用" width="90"/>
-            <el-table-column label="使用率" width="160">
+            <el-table-column label="总容量(cm³)" width="140">
                 <template slot-scope="scope">
-                    <template v-if="scope.row.capacity > 0">
+                    <span v-if="totalVolume(scope.row) > 0">{{ totalVolume(scope.row).toLocaleString() }}</span>
+                    <span v-else style="color:#bbb">未设置</span>
+                </template>
+            </el-table-column>
+            <el-table-column label="已使用(cm³)" width="140">
+                <template slot-scope="scope">
+                    {{ Math.round(scope.row.usedVolume || 0).toLocaleString() }}
+                </template>
+            </el-table-column>
+            <el-table-column label="使用率" width="180">
+                <template slot-scope="scope">
+                    <template v-if="totalVolume(scope.row) > 0">
                         <el-progress
-                            :percentage="Math.min(100, Math.round((scope.row.used||0)/scope.row.capacity*100))"
+                            :percentage="usagePercent(scope.row)"
                             :color="usageColor(scope.row)"
                             :stroke-width="10"
-                            style="width:120px"/>
+                            style="width:160px"/>
                     </template>
                     <span v-else style="color:#bbb">未设置</span>
                 </template>
@@ -56,16 +65,13 @@
                 <el-form-item label="仓库名" prop="name">
                     <el-col :span="20"><el-input v-model="form.name"></el-input></el-col>
                 </el-form-item>
-                <el-form-item label="总容量" prop="capacity">
-                    <el-col :span="20"><el-input v-model.number="form.capacity" placeholder="请输入仓库总容量"></el-input></el-col>
-                </el-form-item>
-                <el-form-item label="长(cm)" prop="length">
+                <el-form-item v-if="form.id" label="长(cm)" prop="length">
                     <el-col :span="20"><el-input v-model.number="form.length" placeholder="仓库长度"></el-input></el-col>
                 </el-form-item>
-                <el-form-item label="高(cm)" prop="height">
+                <el-form-item v-if="form.id" label="高(cm)" prop="height">
                     <el-col :span="20"><el-input v-model.number="form.height" placeholder="仓库高度"></el-input></el-col>
                 </el-form-item>
-                <el-form-item label="宽(cm)" prop="width">
+                <el-form-item v-if="form.id" label="宽(cm)" prop="width">
                     <el-col :span="20"><el-input v-model.number="form.width" placeholder="仓库宽度"></el-input></el-col>
                 </el-form-item>
                 <el-form-item label="备注" prop="remark">
@@ -113,13 +119,9 @@
                 total: 0,
                 name: '',
                 centerDialogVisible: false,
-                form: { id: '', name: '', remark: '', capacity: '', length: 500, height: 300, width: 300 },
+                form: { id: '', name: '', remark: '', capacity: 100, length: 500, height: 300, width: 300 },
                 rules: {
                     name: [{ required: true, message: '请输入仓库名', trigger: 'blur' }],
-                    capacity: [
-                        { required: true, message: '请输入总容量', trigger: 'blur' },
-                        { type: 'number', min: 1, message: '容量必须为正整数', trigger: 'blur' }
-                    ],
                     length: [
                         { required: true, message: '请输入仓库长度', trigger: 'blur' },
                         { type: 'number', min: 1, message: '长度必须大于0', trigger: 'blur' }
@@ -178,10 +180,21 @@
                 done()
             },
             usageColor(row) {
-                const pct = row.capacity > 0 ? (row.used || 0) / row.capacity * 100 : 0
+                const pct = this.usagePercent(row)
                 if (pct >= 90) return '#e74c3c'
                 if (pct >= 70) return '#e6a817'
                 return '#27ae60'
+            },
+            totalVolume(row) {
+                const len = Number(row.length) || 0
+                const hei = Number(row.height) || 0
+                const wid = Number(row.width)  || 0
+                return Math.round(len * hei * wid)
+            },
+            usagePercent(row) {
+                const total = this.totalVolume(row)
+                if (total <= 0) return 0
+                return Math.min(100, Math.round((row.usedVolume || 0) / total * 100))
             },
             resetForm() { this.$refs.form.resetFields() },
             del(id) {

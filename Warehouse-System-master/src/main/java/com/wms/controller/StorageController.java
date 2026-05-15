@@ -68,7 +68,7 @@ public class StorageController {
 
     @GetMapping("/list")
     public Result list() {
-        List<Storage> list = storageService.list();
+        List<Storage> list = storageService.listAllWithUsedVolume();
         return Result.success(list);
     }
 

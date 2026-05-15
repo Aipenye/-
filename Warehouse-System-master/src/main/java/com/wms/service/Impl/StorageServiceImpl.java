@@ -9,6 +9,8 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 /**
  * <p>
  *  服务实现类
@@ -25,5 +27,10 @@ public class StorageServiceImpl extends ServiceImpl<StorageMapper, Storage> impl
     @Override
     public IPage pageCC(IPage<Storage> page, Wrapper wrapper) {
         return storageMapper.pageCC(page,wrapper);
+    }
+
+    @Override
+    public List<Storage> listAllWithUsedVolume() {
+        return storageMapper.listAllWithUsedVolume();
     }
 }

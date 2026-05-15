@@ -57,6 +57,8 @@
           <div class="legend-item"><span class="leg-box agv-run"></span>AGV 正常行驶</div>
           <div class="legend-item"><span class="leg-box agv-cau"></span>AGV 减速</div>
           <div class="legend-item"><span class="leg-box agv-stop"></span>AGV 急停</div>
+          <div class="legend-item"><span class="leg-box agv-exit-park"></span>AGV 驶出停车位</div>
+          <div class="legend-item"><span class="leg-box agv-parking"></span>AGV 倒车入库</div>
           <div class="legend-item"><span class="leg-circle worker-dot"></span>工人</div>
         </div>
       </div>
@@ -75,7 +77,9 @@ const STATE_COLORS = {
   EMERGENCY_STOP: '#e74c3c',
   LIFTING:        '#3498db',
   WAITING_LOCK:   '#9b59b6',
-  RETURNING:      '#1abc9c'
+  RETURNING:      '#1abc9c',
+  EXITING_PARK:   '#f39c12',
+  PARKING:        '#8e44ad'
 }
 
 export default {
@@ -146,7 +150,12 @@ export default {
         const map = {}
         list.forEach(s => {
           if (s.agvSlot != null) {
-            map[s.agvSlot] = { name: s.name, used: s.used || 0, capacity: s.capacity || 0 }
+            const total = (Number(s.length) || 0) * (Number(s.height) || 0) * (Number(s.width) || 0)
+            map[s.agvSlot] = {
+              name: s.name,
+              usedVolume: s.usedVolume || 0,
+              totalVolume: total
+            }
           }
         })
         this.storageSlotMap = map
@@ -261,7 +270,7 @@ export default {
       ctx.textAlign = 'center'
       ctx.fillText('出口', exCx, exCy + 4)
 
-      // 左侧停车区
+      // 左侧停车区背景
       const lx1 = leftParkX1 != null ? leftParkX1 : 32.5
       const lx2 = leftParkX2 != null ? leftParkX2 : 37.5
       const py1 = parkY1 != null ? parkY1 : 1.5
@@ -269,10 +278,42 @@ export default {
       const pH = py2 - py1
       this.drawParkZone(ctx, lx1, py1, lx2 - lx1, pH, '左停车区')
 
-      // 右侧停车区
+      // 右侧停车区背景
       const rx1 = rightParkX1 != null ? rightParkX1 : 42.5
       const rx2 = rightParkX2 != null ? rightParkX2 : 47.5
       this.drawParkZone(ctx, rx1, py1, rx2 - rx1, pH, '右停车区')
+
+      // 绘制4个独立停车位格子和出入口点
+      const slots = this.mapData.parkSlots || []
+      const exitPts = this.mapData.parkExitPoints || []
+      const slotW = 2.0, slotH = 2.0
+      slots.forEach((slot, i) => {
+        // 停车位格子
+        const [sx, sy] = this.toCanvas(slot[0] - slotW / 2, slot[1] + slotH / 2)
+        ctx.strokeStyle = '#6c3483'
+        ctx.lineWidth = 1.5
+        ctx.setLineDash([3, 2])
+        ctx.strokeRect(sx, sy, slotW * this.scale, slotH * this.scale)
+        ctx.setLineDash([])
+        // 编号
+        const [cx2, cy2] = this.toCanvas(slot[0], slot[1])
+        ctx.fillStyle = '#6c3483'
+        ctx.font = `bold ${Math.max(8, this.scale * 0.65)}px sans-serif`
+        ctx.textAlign = 'center'
+        ctx.fillText('P' + (i + 1), cx2, cy2 + 4)
+
+        // 出入口点（小三角箭头，朝南表示倒车方向）
+        if (exitPts[i]) {
+          const [ex, ey] = this.toCanvas(exitPts[i][0], exitPts[i][1])
+          ctx.fillStyle = 'rgba(142,68,173,0.6)'
+          ctx.beginPath()
+          ctx.moveTo(ex, ey - 5)
+          ctx.lineTo(ex - 4, ey + 3)
+          ctx.lineTo(ex + 4, ey + 3)
+          ctx.closePath()
+          ctx.fill()
+        }
+      })
 
       // 货架（含标注）
       const infos = shelfInfos || []
@@ -300,12 +341,12 @@ export default {
         if (info.registered) {
           const sInfo = this.storageSlotMap[info.slot]
           if (sInfo) {
-            const pct = sInfo.capacity > 0
-              ? Math.round(sInfo.used / sInfo.capacity * 100) : 0
+            const pct = sInfo.totalVolume > 0
+              ? Math.min(100, Math.round(sInfo.usedVolume / sInfo.totalVolume * 100)) : 0
             ctx.fillStyle = '#fff'
             ctx.fillText(sInfo.name, cx, cy - fontSize * 0.6)
             ctx.fillStyle = pct >= 90 ? '#e74c3c' : pct >= 60 ? '#e6a817' : '#ecf0f1'
-            ctx.fillText(sInfo.used + '/' + sInfo.capacity, cx, cy + fontSize * 0.8)
+            ctx.fillText(pct + '%', cx, cy + fontSize * 0.8)
           } else {
             ctx.fillStyle = '#ecf0f1'
             ctx.fillText('#' + info.slot, cx, cy + 4)
@@ -499,12 +540,13 @@ export default {
     // ── 辅助 ─────────────────────────────────────────────────
     stateLabel(s) {
       return { IDLE:'待机', RUNNING:'行驶', CAUTION:'减速', EMERGENCY_STOP:'急停',
-               LIFTING:'举升', WAITING_LOCK:'等待', RETURNING:'返回' }[s] || s
+               LIFTING:'举升', WAITING_LOCK:'等待', RETURNING:'返回',
+               EXITING_PARK:'驶出停车位', PARKING:'倒车入库' }[s] || s
     },
     stateClass(s) {
       return { IDLE:'s-idle', RUNNING:'s-run', CAUTION:'s-cau',
                EMERGENCY_STOP:'s-stop', LIFTING:'s-lift', WAITING_LOCK:'s-wait',
-               RETURNING:'s-return' }[s] || ''
+               RETURNING:'s-return', EXITING_PARK:'s-exit-park', PARKING:'s-parking' }[s] || ''
     }
   }
 }
@@ -549,13 +591,14 @@ export default {
   background: #f8f9fa; border-radius: 8px; padding: 8px 10px;
   margin-bottom: 8px; border-left: 3px solid #95a5a6;
 }
-.agv-card.s-run    { border-left-color: #27ae60; }
-.agv-card.s-cau    { border-left-color: #e6a817; }
-.agv-card.s-stop   { border-left-color: #e74c3c; }
-.agv-card.s-lift   { border-left-color: #3498db; }
-.agv-card.s-wait   { border-left-color: #9b59b6; }
-.agv-card.s-return { border-left-color: #1abc9c; }
-.agv-card.s-return { border-left-color: #1abc9c; }
+.agv-card.s-run         { border-left-color: #27ae60; }
+.agv-card.s-cau         { border-left-color: #e6a817; }
+.agv-card.s-stop        { border-left-color: #e74c3c; }
+.agv-card.s-lift        { border-left-color: #3498db; }
+.agv-card.s-wait        { border-left-color: #9b59b6; }
+.agv-card.s-return      { border-left-color: #1abc9c; }
+.agv-card.s-exit-park   { border-left-color: #f39c12; }
+.agv-card.s-parking     { border-left-color: #8e44ad; }
 
 .agv-id    { font-size: 13px; font-weight: 700; color: #2c3e50; }
 .agv-info  { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
@@ -563,12 +606,14 @@ export default {
   font-size: 10px; padding: 1px 6px; border-radius: 8px;
   background: #ecf0f1; color: #7f8c8d;
 }
-.state-badge.s-run    { background: rgba(39,174,96,0.15);  color: #27ae60; }
-.state-badge.s-cau    { background: rgba(230,168,23,0.15); color: #e6a817; }
-.state-badge.s-stop   { background: rgba(231,76,60,0.15);  color: #e74c3c; }
-.state-badge.s-lift   { background: rgba(52,152,219,0.15); color: #3498db; }
-.state-badge.s-wait   { background: rgba(155,89,182,0.15); color: #9b59b6; }
-.state-badge.s-return { background: rgba(26,188,156,0.15); color: #1abc9c; }
+.state-badge.s-run        { background: rgba(39,174,96,0.15);   color: #27ae60; }
+.state-badge.s-cau        { background: rgba(230,168,23,0.15);  color: #e6a817; }
+.state-badge.s-stop       { background: rgba(231,76,60,0.15);   color: #e74c3c; }
+.state-badge.s-lift       { background: rgba(52,152,219,0.15);  color: #3498db; }
+.state-badge.s-wait       { background: rgba(155,89,182,0.15);  color: #9b59b6; }
+.state-badge.s-return     { background: rgba(26,188,156,0.15);  color: #1abc9c; }
+.state-badge.s-exit-park  { background: rgba(243,156,18,0.15);  color: #f39c12; }
+.state-badge.s-parking    { background: rgba(142,68,173,0.15);  color: #8e44ad; }
 .agv-detail { font-size: 11px; color: #95a5a6; }
 .agv-pos, .agv-speed { font-size: 11px; color: #7f8c8d; }
 .agv-task { font-size: 11px; color: #2980b9; margin-top: 2px; }
@@ -595,8 +640,10 @@ export default {
 .human-zone { background: rgba(231,76,60,0.25); border: 1px solid #e74c3c; }
 .exit-zone  { background: rgba(46,204,113,0.35); border: 1px solid #27ae60; }
 .park-zone  { background: rgba(155,89,182,0.25); border: 1px dashed #8e44ad; }
-.agv-run    { background: #27ae60; }
-.agv-cau    { background: #e6a817; }
-.agv-stop   { background: #e74c3c; }
-.worker-dot { background: #f39c12; }
+.agv-run       { background: #27ae60; }
+.agv-cau       { background: #e6a817; }
+.agv-stop      { background: #e74c3c; }
+.agv-exit-park { background: #f39c12; }
+.agv-parking   { background: #8e44ad; }
+.worker-dot    { background: #f39c12; }
 </style>

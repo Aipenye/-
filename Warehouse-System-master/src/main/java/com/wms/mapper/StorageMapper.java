@@ -8,6 +8,8 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+
 /**
  * <p>
  *  Mapper 接口
@@ -19,4 +21,7 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface StorageMapper extends BaseMapper<Storage> {
     IPage pageCC(IPage<Storage> page, @Param(Constants.WRAPPER) Wrapper wrapper);
+
+    /** 列出所有仓库，并聚合每个仓库内的货物总体积（cm³）到 usedVolume 字段 */
+    List<Storage> listAllWithUsedVolume();
 }

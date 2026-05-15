@@ -37,11 +37,20 @@ public class WarehouseMap {
     public static final double PARK_Y1 = 1.5;
     public static final double PARK_Y2 = 4.0;
 
-    // 三辆AGV停车位：左区两辆，右区一辆
+    // 四个独立停车位：左区两辆，右区两辆
     public static final double[][] PARK_SLOTS = {
-        {34.0, 2.5},
-        {36.0, 2.5},
-        {44.0, 2.5}
+        {33.5, 2.5},
+        {36.5, 2.5},
+        {43.5, 2.5},
+        {46.5, 2.5}
+    };
+
+    // 每个停车位正北方向的出入口点（y=5.5，位于停车区外）
+    public static final double[][] PARK_EXIT_POINTS = {
+        {33.5, 5.5},
+        {36.5, 5.5},
+        {43.5, 5.5},
+        {46.5, 5.5}
     };
 
     private final boolean[][] obstacle = new boolean[COLS][ROWS];

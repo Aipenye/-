@@ -83,6 +83,7 @@ public class AgvSimulationEngine {
             a.setState(AgvState.IDLE);
             agvs.add(a);
         }
+        // 第4个停车位（index=3）预留，暂无AGV
     }
 
     private void initWorkers() {
@@ -172,11 +173,21 @@ public class AgvSimulationEngine {
                 continue;
             }
 
+            // 倒车入库中：朝北(90°)缓慢向南倒入停车位
+            if (agv.getState() == AgvState.PARKING) {
+                handleParkingState(agv);
+                continue;
+            }
+
             // 无路径时：IDLE停在停车区，或尝试接收新任务（倒车中跳过）
             if (!agv.hasPath() && agv.getState() != AgvState.REVERSING) {
                 if (agv.getState() == AgvState.RETURNING) {
-                    // 刚到达停车区
-                    agv.setState(AgvState.IDLE);
+                    // 到达出入口点，切换为倒车入库
+                    agv.setState(AgvState.PARKING);
+                    agv.setAngle(90); // 朝北，倒车方向为正南
+                    agv.setSpeed(0);
+                    handleParkingState(agv);
+                    continue;
                 }
                 if (agv.getState() == AgvState.IDLE && !agv.hasTask()) {
                     // 尝试从数据库拉取待处理的AGV工单
@@ -295,7 +306,8 @@ public class AgvSimulationEngine {
             if (ar.state() == AgvState.CAUTION) {
                 agv.setState(AgvState.CAUTION);
             } else if (agv.getState() != AgvState.RETURNING
-                    && agv.getState() != AgvState.REVERSING) {
+                    && agv.getState() != AgvState.REVERSING
+                    && agv.getState() != AgvState.EXITING_PARK) {
                 agv.setState(AgvState.RUNNING);
             }
 
@@ -317,6 +329,11 @@ public class AgvSimulationEngine {
                 agv.setY(wp[1]);
                 agv.advanceWaypoint();
 
+                // 驶出停车位：到达出入口点后切换为正常行驶
+                if (agv.getState() == AgvState.EXITING_PARK && agv.hasPath()) {
+                    agv.setState(AgvState.RUNNING);
+                }
+
                 if (!agv.hasPath()) {
                     // 到达终点
                     if (agv.hasTask()) {
@@ -325,10 +342,10 @@ public class AgvSimulationEngine {
                         agv.setLiftingRemaining(20000);
                         agv.setSpeed(0);
                     } else {
-                        // 到达停车区，调头朝向出口（朝南，270°）
-                        agv.setState(AgvState.IDLE);
+                        // 到达出入口点（RETURNING终点），切换为倒车入库
+                        agv.setState(AgvState.PARKING);
+                        agv.setAngle(90); // 朝北，倒车方向为正南
                         agv.setSpeed(0);
-                        agv.setAngle(270);
                     }
                 }
             } else {
@@ -353,13 +370,13 @@ public class AgvSimulationEngine {
         agv.getTempObstacles().clear(); // 任务阶段完成，清空临时障碍
 
         if (agv.hasTask()) {
-            // 完成工单：更新库存，然后返回停车区
+            // 完成工单：更新库存，然后返回停车区出入口点
             finishOrder(agv);
             agv.setCurrentOrderId(-1);
             agv.setTargetSlot(-1);
-            // 规划回停车区路径
-            double[] parkPos = WarehouseMap.PARK_SLOTS[agv.getParkSlotIndex()];
-            List<double[]> path = pathfinder.findPath(agv.getX(), agv.getY(), parkPos[0], parkPos[1]);
+            // 规划回停车位出入口点的路径（到达后再倒车入库）
+            double[] exitPt = WarehouseMap.PARK_EXIT_POINTS[agv.getParkSlotIndex()];
+            List<double[]> path = pathfinder.findPath(agv.getX(), agv.getY(), exitPt[0], exitPt[1]);
             if (path != null && !path.isEmpty()) {
                 agv.setPath(path);
                 agv.setPathIndex(0);
@@ -374,17 +391,33 @@ public class AgvSimulationEngine {
 
     /** 完成工单：更新货物库存和仓库使用量 */
     private void finishOrder(AgvEntity agv) {
+        WorkOrder order;
         try {
-            WorkOrder order = workOrderService.getById(agv.getCurrentOrderId());
-            if (order == null || order.getStatus() == 1) return;
+            order = workOrderService.getById(agv.getCurrentOrderId());
+            if (order == null || (order.getStatus() != null && order.getStatus() == 1)) return;
+        } catch (Exception e) {
+            return;
+        }
 
+        // 关键一步：先把工单置为已完成，避免 AGV 回停车位后又把同一工单捞起来重做
+        try {
+            order.setStatus(1);
+            order.setFinishTime(LocalDateTime.now());
+            workOrderService.updateById(order);
+        } catch (Exception e) {
+            return;
+        }
+
+        // 后续的库存/记录更新失败不应影响工单完成状态
+        try {
             int delta = (order.getType() != null && order.getType() == 1)
                     ? -order.getCount() : order.getCount();
 
             Goods goods = goodsService.getById(order.getGoodsId());
             if (goods != null) {
+                int curCount = goods.getCount() == null ? 0 : goods.getCount();
                 goods.setStorage(order.getStorageId());
-                goods.setCount(goods.getCount() + delta);
+                goods.setCount(Math.max(0, curCount + delta));
                 goodsService.updateById(goods);
             }
 
@@ -403,10 +436,6 @@ public class AgvSimulationEngine {
             record.setRemark("AGV-" + agv.getId() + " 工单#" + order.getId()
                     + (delta > 0 ? " 完成入库" : " 完成出库"));
             recordService.save(record);
-
-            order.setStatus(1);
-            order.setFinishTime(LocalDateTime.now());
-            workOrderService.updateById(order);
 
             // 异步触发装箱优化，更新该仓库的3D布局缓存
             boxOptimizationService.optimizeAndSave(order.getStorageId());
@@ -446,8 +475,13 @@ public class AgvSimulationEngine {
             double[] target = map.getSlotApproachPoint(slot);
             if (target == null) return;
 
-            List<double[]> path = pathfinder.findPath(agv.getX(), agv.getY(), target[0], target[1]);
-            if (path.isEmpty()) return;
+            // 先规划从出入口点到目标的路径，再在路径头部插入出入口点
+            double[] exitPt = WarehouseMap.PARK_EXIT_POINTS[agv.getParkSlotIndex()];
+            List<double[]> pathToTarget = pathfinder.findPath(exitPt[0], exitPt[1], target[0], target[1]);
+            if (pathToTarget.isEmpty()) return;
+            List<double[]> fullPath = new ArrayList<>();
+            fullPath.add(exitPt);
+            fullPath.addAll(pathToTarget);
 
             // 将工单的 agv_id 更新为本车，防止其他车重复接取
             if (order.getAgvId() == null) {
@@ -455,13 +489,13 @@ public class AgvSimulationEngine {
                 workOrderService.updateById(order);
             }
 
-            agv.setPath(path);
+            agv.setPath(fullPath);
             agv.setPathIndex(0);
             agv.setCurrentOrderId(order.getId());
             agv.setTargetSlot(slot);
             agv.setTargetX(target[0]);
             agv.setTargetY(target[1]);
-            agv.setState(AgvState.RUNNING);
+            agv.setState(AgvState.EXITING_PARK);
         } catch (Exception ignored) {}
     }
 
@@ -486,8 +520,8 @@ public class AgvSimulationEngine {
             if (pt == null) return null;
             tx = pt[0]; ty = pt[1];
         } else {
-            double[] park = WarehouseMap.PARK_SLOTS[agv.getParkSlotIndex()];
-            tx = park[0]; ty = park[1];
+            double[] exitPt = WarehouseMap.PARK_EXIT_POINTS[agv.getParkSlotIndex()];
+            tx = exitPt[0]; ty = exitPt[1];
         }
         List<double[]> path = pathfinder.findPath(agv.getX(), agv.getY(), tx, ty,
                 agv.getTempObstacles());
@@ -495,7 +529,34 @@ public class AgvSimulationEngine {
     }
 
     /**
-     * 将小车当前朝向前方区域标记为临时障碍，考虑小车和障碍物的体积。
+     * 倒车入库：AGV朝北(90°)，向正南缓慢倒入停车位。
+     * 到达停车位后设为IDLE。
+     */
+    private void handleParkingState(AgvEntity agv) {
+        double[] slot = WarehouseMap.PARK_SLOTS[agv.getParkSlotIndex()];
+        double dy = slot[1] - agv.getY(); // 正值表示目标在北，负值表示目标在南
+
+        // 倒车方向为正南（y减小），当 agv.y <= slot[1] 时说明已到达或越过目标
+        if (agv.getY() <= slot[1] + 0.05) {
+            agv.setX(slot[0]);
+            agv.setY(slot[1]);
+            agv.setState(AgvState.IDLE);
+            agv.setSpeed(0);
+            agv.setAngle(90);
+        } else {
+            double reverseSpeed = 0.4;
+            double step = reverseSpeed * DT;
+            // 防止越过目标点：若剩余距离小于一步，直接到位
+            double remaining = agv.getY() - slot[1];
+            double moveY = Math.min(step, remaining);
+            agv.setX(slot[0]);
+            agv.setY(agv.getY() - moveY);
+            agv.setAngle(90);
+            agv.setSpeed(reverseSpeed);
+        }
+    }
+
+    /**
      * 以前方中心线为轴，向两侧各扩展 AGV_HALF_WIDTH，形成宽禁区。
      */
     private static final double AGV_HALF_WIDTH = 1.5; // 小车半宽 + 障碍物半宽，单位 m
@@ -543,16 +604,20 @@ public class AgvSimulationEngine {
                     double[] target = map.getSlotApproachPoint(slot);
                     if (target == null) return -1;
 
-                    List<double[]> path = pathfinder.findPath(agv.getX(), agv.getY(), target[0], target[1]);
-                    if (path.isEmpty()) continue; // 该车路径规划失败，尝试下一辆
+                    double[] exitPt = WarehouseMap.PARK_EXIT_POINTS[agv.getParkSlotIndex()];
+                    List<double[]> pathToTarget = pathfinder.findPath(exitPt[0], exitPt[1], target[0], target[1]);
+                    if (pathToTarget.isEmpty()) continue;
+                    List<double[]> fullPath = new ArrayList<>();
+                    fullPath.add(exitPt);
+                    fullPath.addAll(pathToTarget);
 
-                    agv.setPath(path);
+                    agv.setPath(fullPath);
                     agv.setPathIndex(0);
                     agv.setCurrentOrderId(orderId);
                     agv.setTargetSlot(slot);
                     agv.setTargetX(target[0]);
                     agv.setTargetY(target[1]);
-                    agv.setState(AgvState.RUNNING);
+                    agv.setState(AgvState.EXITING_PARK);
                     return agv.getId();
                 } catch (Exception e) {
                     return -1;

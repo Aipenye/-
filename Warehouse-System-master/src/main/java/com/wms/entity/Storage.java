@@ -1,6 +1,7 @@
 package com.wms.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import java.io.Serializable;
 import lombok.Data;
@@ -31,4 +32,8 @@ public class Storage implements Serializable {
 
     /** AGV货架编号(1-48)，对应仓库地图中的货架格子，NULL表示未注册 */
     private Integer agvSlot;
+
+    /** 该仓库内货物总体积(cm³)，由SQL聚合计算，非数据库列 */
+    @TableField(exist = false)
+    private Double usedVolume;
 }

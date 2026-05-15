@@ -11,6 +11,7 @@
             </el-select>
             <el-button type="primary" size="small" icon="el-icon-search" @click="loadPost" class="round-btn">查询</el-button>
             <el-button size="small" icon="el-icon-refresh" @click="resetParam" class="round-btn">重置</el-button>
+            <el-button type="success" size="small" icon="el-icon-plus" @click="addGoods" class="round-btn" style="margin-left:auto">新增物品</el-button>
         </div>
         <div class="table-card">
         <el-table :data="tableData"
@@ -39,6 +40,38 @@
                 :total="total"/>
         </div>
         </div>
+
+        <!-- 新增物品对话框 -->
+        <el-dialog title="新增物品" :visible.sync="addDialogVisible" width="35%" center>
+            <el-form ref="addForm" :rules="addRules" :model="addForm" label-width="80px">
+                <el-form-item label="物品名" prop="name">
+                    <el-col :span="20"><el-input v-model="addForm.name" placeholder="请输入物品名"></el-input></el-col>
+                </el-form-item>
+                <el-form-item label="分类" prop="goodstype">
+                    <el-col :span="20">
+                        <el-select v-model="addForm.goodstype" placeholder="请选择物品分类" style="width:100%">
+                            <el-option v-for="item in goodstypeData" :key="item.id" :label="item.name" :value="item.id"/>
+                        </el-select>
+                    </el-col>
+                </el-form-item>
+                <el-form-item label="长(cm)" prop="length">
+                    <el-col :span="20"><el-input v-model.number="addForm.length" placeholder="物品长度"></el-input></el-col>
+                </el-form-item>
+                <el-form-item label="宽(cm)" prop="width">
+                    <el-col :span="20"><el-input v-model.number="addForm.width" placeholder="物品宽度"></el-input></el-col>
+                </el-form-item>
+                <el-form-item label="高(cm)" prop="height">
+                    <el-col :span="20"><el-input v-model.number="addForm.height" placeholder="物品高度"></el-input></el-col>
+                </el-form-item>
+                <el-form-item label="备注">
+                    <el-col :span="20"><el-input type="textarea" v-model="addForm.remark" placeholder="备注（可选）"></el-input></el-col>
+                </el-form-item>
+            </el-form>
+            <span slot="footer" class="dialog-footer">
+                <el-button @click="addDialogVisible = false">取 消</el-button>
+                <el-button type="primary" @click="saveGoods">确 定</el-button>
+            </span>
+        </el-dialog>
 
         <!-- 设置尺寸对话框 -->
         <el-dialog title="设置货物尺寸" :visible.sync="dimDialogVisible" width="30%" center>
@@ -81,9 +114,45 @@
                 goodstype: '',
                 dimDialogVisible: false,
                 dimForm: { id: '', name: '', length: 1, height: 1, width: 1 },
+                addDialogVisible: false,
+                addForm: { name: '', goodstype: '', length: null, width: null, height: null, remark: '' },
+                addRules: {
+                    name:      [{ required: true, message: '请输入物品名', trigger: 'blur' }],
+                    goodstype: [{ required: true, message: '请选择物品分类', trigger: 'change' }],
+                    length: [{ required: true, message: '请输入长度', trigger: 'blur' },
+                             { type: 'number', min: 0.01, message: '长度必须大于0', trigger: 'blur' }],
+                    width:  [{ required: true, message: '请输入宽度', trigger: 'blur' },
+                             { type: 'number', min: 0.01, message: '宽度必须大于0', trigger: 'blur' }],
+                    height: [{ required: true, message: '请输入高度', trigger: 'blur' },
+                             { type: 'number', min: 0.01, message: '高度必须大于0', trigger: 'blur' }]
+                }
             }
         },
         methods: {
+            addGoods() {
+                this.addForm = { name: '', goodstype: '', length: null, width: null, height: null, remark: '' }
+                this.$nextTick(() => { this.$refs.addForm && this.$refs.addForm.resetFields() })
+                this.addDialogVisible = true
+            },
+            saveGoods() {
+                this.$refs.addForm.validate(valid => {
+                    if (!valid) {
+                        this.$message({ message: '请完整填写必填项', type: 'warning' })
+                        return
+                    }
+                    this.$axios.post(this.$httpUrl + '/goods/save', this.addForm).then(res => res.data).then(res => {
+                        if (res.code == 200) {
+                            this.$message({ message: '新增成功！', type: 'success' })
+                            this.addDialogVisible = false
+                            this.loadPost()
+                        } else {
+                            this.$message({ message: '新增失败！', type: 'error' })
+                        }
+                    }).catch(err => {
+                        this.$message({ message: '新增失败：' + (err.message || '请求异常'), type: 'error' })
+                    })
+                })
+            },
             openDimDialog(row) {
                 this.dimForm = { id: row.id, name: row.name, length: row.length || 1, height: row.height || 1, width: row.width || 1 }
                 this.dimDialogVisible = true
